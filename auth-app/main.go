@@ -3,6 +3,7 @@ package main
 import (
 	"auth-app/cmd"
 
+	_ "github.com/joho/godotenv/autoload"
 	"github.com/rs/zerolog/log"
 )
 

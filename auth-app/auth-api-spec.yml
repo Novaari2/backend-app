@@ -1,0 +1,216 @@
+openapi: '3.0.3'
+info:
+  title: Authentication API
+  description: API for Authentication App
+  version: '1.0.0'
+servers:
+  - url: http://localhost:8080/api/v1/auth
+    description: Development Server
+
+tags:
+  - name: Authentication
+    description: Semua endpoint terkait proses otentikasi, seperti registrasi pengguna, login, dan validasi akses token.
+
+paths:
+  /register:
+    post:
+      summary: Register new user
+      description: Endpoint untuk mendaftarkan pengguna baru. Sistem akan menghasilkan password acak sepanjang 6 karakter.
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - nik
+                - role
+              properties:
+                nik:
+                  type: string
+                  description: Nomor Induk Kependudukan (harus 16 karakter).
+                  example: "1234567890123456"
+                role:
+                  type: string
+                  description: Role pengguna, misalnya admin atau user.
+                  example: "admin"
+      responses:
+        200:
+          description: User berhasil di-registrasi dan password berhasil digenerate.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: "User registered successfully."
+                  data:
+                    type: object
+                    properties:
+                      nik:
+                        type: string
+                        example: "1234567890123456"
+                      role:
+                        type: string
+                        example: "admin"
+                      password:
+                        type: string
+                        example: "a1b2c3"
+        400:
+          description: Data tidak valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: integer
+                    example: 400
+                  message:
+                    type: string
+                    example: "Invalid NIK. It must be 16 characters."
+                  data:
+                    type: object
+                    nullable: true
+                    example: null
+
+
+  /login:
+    post:
+      summary: Login user
+      description: Endpoint untuk autentikasi user berdasarkan NIK dan password.
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - nik
+                - password
+              properties:
+                nik:
+                  type: string
+                  description: NIK pengguna (16 karakter).
+                  example: "1234567890123456"
+                password:
+                  type: string
+                  description: Password pengguna.
+                  example: "a1b2c3"
+      responses:
+        200:
+          description: Login berhasil, JWT Token akan dikembalikan untuk autentikasi selanjutnya.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: "Login successful."
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        description: ID unik user dalam sistem.
+                        example: "1"
+                      nik:
+                        type: string
+                        example: "1234567890123456"
+                      role:
+                        type: string
+                        description: Role pengguna, misalnya admin atau user.
+                        example: "admin"
+                      token:
+                        type: string
+                        description: JWT Access Token.
+                        example: "eyJhbGciOiJIUzI1NiIsInR5..."
+        401:
+          description: Unauthorized (NIK tidak ditemukan atau password salah).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: integer
+                    example: 401
+                  message:
+                    type: string
+                    example: "Unauthorized. Invalid NIK or password."
+                  data:
+                    type: object
+                    nullable: true
+                    example: null
+
+  /validate-token:
+    get:
+      summary: Validate access token
+      description: Endpoint untuk memvalidasi token akses JWT dan mengambil private claim pengguna (jika token valid).
+      tags:
+        - Authentication
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+            example: Bearer eyJhbGc... (Bearer <JWT Token>)
+          description: JWT Token untuk autentikasi. Harap gunakan format Bearer <token>.
+      responses:
+        200:
+          description: Token valid. Mengembalikan klaim private data dari JWT.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: "Token is valid."
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        description: ID unik dari pengguna.
+                        example: "1"
+                      nik:
+                        type: string
+                        example: "1234567890123456"
+                      role:
+                        type: string
+                        description: Role pengguna, seperti "admin" atau "user".
+                        example: "admin"
+        401:
+          description: Unauthorized (Token tidak valid atau token sudah kadaluwarsa).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: integer
+                    example: 401
+                  message:
+                    type: string
+                    example: "Unauthorized. Invalid or expired token."
+                  data:
+                    type: object
+                    nullable: true
+                    example: null

@@ -1,6 +1,10 @@
 package api
 
 import (
+	"auth-app/internal/config"
+	"auth-app/internal/entity"
+	"auth-app/internal/users"
+	"auth-app/internal/utils"
 	"context"
 	"fmt"
 	"net/http"
@@ -13,11 +17,50 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/cors"
 	"github.com/rs/zerolog/log"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func NewServer() *server {
+	cfg := config.Load()
+
+	dsn := fmt.Sprintf("host=%s port=%d user=%s dbname=%s password=%s sslmode=disable",
+		cfg.Database.Host,
+		cfg.Database.Port,
+		cfg.Database.User,
+		cfg.Database.DbName,
+		cfg.Database.Password,
+	)
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+
+	if err != nil {
+		log.Fatal().Err(err).Msg("Unable to open database connection")
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to get sql db")
+	}
+
+	sqlDB.SetMaxIdleConns(5)
+	sqlDB.SetMaxOpenConns(10)
+	sqlDB.SetConnMaxLifetime(time.Hour)
+
+	err = db.AutoMigrate(&entity.User{})
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to migrate database")
+	}
+
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP)
+	passwordGenerator := utils.GeneratePassword
+	userReposiory := users.NewRepository(db)
+	userService := users.NewService(userReposiory, passwordGenerator)
+	userHandler := users.NewHTTPHandler(userService)
 
 	r.Use(cors.New(cors.Options{
 		AllowedOrigins:     []string{"*"},
@@ -31,6 +74,10 @@ func NewServer() *server {
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
+	})
+
+	r.Route("/api/v1/auth", func(r chi.Router) {
+		r.Post("/register", userHandler.RegisterUserHandler)
 	})
 
 	return &server{router: r}
