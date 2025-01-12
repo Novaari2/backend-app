@@ -57,9 +57,12 @@ func NewServer() *server {
 
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP)
+
 	passwordGenerator := utils.GeneratePassword
+	tokenGenerator := utils.NewTokenGenerator(cfg.App.JwtSecret)
+
 	userReposiory := users.NewRepository(db)
-	userService := users.NewService(userReposiory, passwordGenerator)
+	userService := users.NewService(userReposiory, passwordGenerator, tokenGenerator)
 	userHandler := users.NewHTTPHandler(userService)
 
 	r.Use(cors.New(cors.Options{
@@ -78,6 +81,7 @@ func NewServer() *server {
 
 	r.Route("/api/v1/auth", func(r chi.Router) {
 		r.Post("/register", userHandler.RegisterUserHandler)
+		r.Post("/login", userHandler.LoginUserHandler)
 	})
 
 	return &server{router: r}

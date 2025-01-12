@@ -8,31 +8,34 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+type Service interface {
+	RegisterUser(ctx context.Context, req *RegisterUserRequest) (*RegisterUserResponse, error)
+	LoginUser(ctx context.Context, req *LoginUserRequest) (*LoginUserResponse, error)
+}
+
 type PasswordGenerator func(int) string
 
-type Repository interface {
-	Save(ctx context.Context, user *entity.User) error
-}
-
-type Service struct {
+type service struct {
 	repo             Repository
 	generatePassword PasswordGenerator
+	tokenGenerator   utils.TokenGenerator
 }
 
-func NewService(repo Repository, generatePassword PasswordGenerator) *Service {
-	return &Service{
+func NewService(repo Repository, generatePassword PasswordGenerator, tokenGenerator utils.TokenGenerator) *service {
+	return &service{
 		repo:             repo,
 		generatePassword: generatePassword,
+		tokenGenerator:   tokenGenerator,
 	}
 }
 
-func (s *Service) RegisterUser(ctx context.Context, req *RegisterUserRequest) (RegisterUserResponse, error) {
+func (s *service) RegisterUser(ctx context.Context, req *RegisterUserRequest) (*RegisterUserResponse, error) {
 	pass := s.generatePassword(6)
 
 	hashPass, err := utils.HashPassword(pass)
 	if err != nil {
 		log.Err(err).Msg("Failed to hash password")
-		return RegisterUserResponse{}, err
+		return &RegisterUserResponse{}, err
 	}
 
 	user := &entity.User{
@@ -44,12 +47,39 @@ func (s *Service) RegisterUser(ctx context.Context, req *RegisterUserRequest) (R
 	err = s.repo.Save(ctx, user)
 	if err != nil {
 		log.Err(err).Msg("Failed to save user")
-		return RegisterUserResponse{}, err
+		return &RegisterUserResponse{}, err
 	}
 
-	return RegisterUserResponse{
+	return &RegisterUserResponse{
 		Nik:      req.Nik,
 		Role:     req.Role,
 		Password: pass,
+	}, nil
+}
+
+func (s *service) LoginUser(ctx context.Context, req *LoginUserRequest) (*LoginUserResponse, error) {
+	user, err := s.repo.FindByNik(ctx, req.Nik)
+	if err != nil {
+		log.Err(err).Msg("Failed to find user")
+		return &LoginUserResponse{}, err
+	}
+
+	err = utils.CheckPasswordHash(req.Password, user.Password)
+	if err != nil {
+		log.Err(err).Msg("Password does not match")
+		return &LoginUserResponse{}, err
+	}
+
+	token, err := s.tokenGenerator.GenerateJWT(user.Nik, user.Password)
+	if err != nil {
+		log.Err(err).Msg("Failed to generate token")
+		return &LoginUserResponse{}, err
+	}
+
+	return &LoginUserResponse{
+		ID:    user.ID,
+		Nik:   req.Nik,
+		Role:  user.Role,
+		Token: token,
 	}, nil
 }
