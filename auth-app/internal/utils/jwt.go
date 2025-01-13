@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -14,7 +16,7 @@ type JWTClaims struct {
 
 type TokenGenerator interface {
 	GenerateJWT(nik, password string) (string, error)
-	// ValidateJwt(tokenString string) (*JWTClaims, error)
+	ValidateJwt(tokenString string) (*JWTClaims, error)
 }
 
 type DefaultTokenGenerator struct {
@@ -41,19 +43,25 @@ func (t *DefaultTokenGenerator) GenerateJWT(nik string, password string) (string
 	return token.SignedString([]byte(t.secretKey))
 }
 
-// func (t *DefaultTokenGenerator) ValidateJwt(tokenString string) (*JWTClaims, error) {
-// 	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
-// 		return []byte(t.secretKey), nil
-// 	})
+func (t *DefaultTokenGenerator) ValidateJwt(tokenString string) (*JWTClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
 
-// 	if err != nil {
-// 		return nil, err
-// 	}
+		return []byte(t.secretKey), nil
+	})
 
-// 	claims, ok := token.Claims.(*JWTClaims)
-// 	if !ok || !token.Valid {
-// 		return nil, fmt.Errorf("invalid token")
-// 	}
+	if err != nil {
+		return nil, err
+	}
 
-// 	return claims, nil
-// }
+	if claims, ok := token.Claims.(*JWTClaims); ok && token.Valid {
+		if claims.ExpiresAt.Before(time.Now()) {
+			return nil, errors.New("token has expired")
+		}
+		return claims, nil
+	} else {
+		return nil, errors.New("invalid token")
+	}
+}

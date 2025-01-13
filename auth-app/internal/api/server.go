@@ -82,6 +82,7 @@ func NewServer() *server {
 	r.Route("/api/v1/auth", func(r chi.Router) {
 		r.Post("/register", userHandler.RegisterUserHandler)
 		r.Post("/login", userHandler.LoginUserHandler)
+		r.With(RequestJWTMiddleware).Get("/validate-token", userHandler.ValidateTokenHandler)
 	})
 
 	return &server{router: r}

@@ -82,3 +82,22 @@ func (h *httpHandler) LoginUserHandler(w http.ResponseWriter, r *http.Request) {
 	response := utils.ApiResponse(http.StatusOK, "User logged in successfully", user)
 	resp.WriteJSON(w, http.StatusOK, response)
 }
+
+func (h *httpHandler) ValidateTokenHandler(w http.ResponseWriter, r *http.Request) {
+	tokenString, ok := r.Context().Value("token").(string)
+	if !ok {
+		http.Error(w, "Token not found", http.StatusUnauthorized)
+		return
+	}
+
+	// PrettyJSON(tokenString)
+	claims, err := h.svc.ValidateToken(r.Context(), tokenString)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	response := utils.ApiResponse(http.StatusOK, "Token is valid", claims)
+	resp.WriteJSON(w, http.StatusOK, response)
+
+}

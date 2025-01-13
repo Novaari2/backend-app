@@ -28,3 +28,12 @@ func (m *MockService) LoginUser(ctx context.Context, req *users.LoginUserRequest
 
 	return nil, args.Error(1)
 }
+
+func (m *MockService) ValidateToken(ctx context.Context, tokenString string) (*users.PayloadResponse, error) {
+	args := m.Called(ctx, tokenString)
+	if args.Get(0) != nil {
+		return args.Get(0).(*users.PayloadResponse), args.Error(1)
+	}
+
+	return nil, args.Error(1)
+}

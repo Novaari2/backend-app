@@ -4,13 +4,26 @@ import (
 	"auth-app/internal/entity"
 	"auth-app/internal/utils"
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/rs/zerolog/log"
 )
 
+func PrettyJSON(myStruct interface{}) {
+	prettyJSON, err := json.MarshalIndent(myStruct, "", " ")
+	if err != nil {
+		fmt.Println("Failed to generate json", err)
+		return
+	}
+
+	fmt.Println(string(prettyJSON))
+}
+
 type Service interface {
 	RegisterUser(ctx context.Context, req *RegisterUserRequest) (*RegisterUserResponse, error)
 	LoginUser(ctx context.Context, req *LoginUserRequest) (*LoginUserResponse, error)
+	ValidateToken(ctx context.Context, tokenString string) (*PayloadResponse, error)
 }
 
 type PasswordGenerator func(int) string
@@ -81,5 +94,19 @@ func (s *service) LoginUser(ctx context.Context, req *LoginUserRequest) (*LoginU
 		Nik:   req.Nik,
 		Role:  user.Role,
 		Token: token,
+	}, nil
+}
+
+func (s *service) ValidateToken(ctx context.Context, tokenString string) (*PayloadResponse, error) {
+	jwt, err := s.tokenGenerator.ValidateJwt(tokenString)
+	if err != nil {
+		log.Err(err).Msg("Failed to validate token")
+		return &PayloadResponse{}, err
+	}
+
+	return &PayloadResponse{
+		Nik:      jwt.Nik,
+		Password: jwt.Password,
+		Exp:      jwt.ExpiresAt.Unix(),
 	}, nil
 }

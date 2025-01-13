@@ -22,3 +22,9 @@ type LoginUserResponse struct {
 	Role  string `json:"role"`
 	Token string `json:"token"`
 }
+
+type PayloadResponse struct {
+	Nik      string `json:"nik"`
+	Password string `json:"password"`
+	Exp      int64  `json:"exp"`
+}
